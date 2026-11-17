@@ -1,0 +1,67 @@
+# Bedtime call: rings the phone every day at 22:45 for 30 seconds and says it is
+# time for bed. Records whether the call was picked up.
+#
+# Install as a Home Assistant package (see ha/install_ha.sh for enabling packages):
+#   sudo cp ha/examples/bedtime.yaml <ha config>/packages/bedtime.yaml
+# then Developer Tools -> YAML -> Check configuration, and restart Home Assistant
+# (new counters need a restart).
+#
+# Needs ha/phonejack_ha.yaml installed first (provides rest_command.phonejack_call).
+# The time below uses Home Assistant's configured time zone.
+
+counter:
+  bedtime_picked_up:
+    name: Bedtime calls picked up
+    icon: mdi:phone-in-talk
+  bedtime_missed:
+    name: Bedtime calls missed
+    icon: mdi:phone-missed
+
+automation:
+  - alias: "Bedtime - ring the phone"
+    id: bedtime_ring
+    mode: single
+    trigger:
+      - platform: time
+        at: "22:45:00"
+    action:
+      - service: rest_command.phonejack_call
+        data:
+          say: "Hi. It's quarter to eleven. It's time to go to bed. Goodnight."
+          id: bedtime
+          ring_seconds: 30
+          hangup_wait_seconds: 20
+
+  - alias: "Bedtime - log the result"
+    id: bedtime_result
+    mode: queued
+    trigger:
+      - platform: event
+        event_type: phonejack_result
+        event_data:
+          id: bedtime
+    action:
+      - choose:
+          - conditions: "{{ trigger.event.data.status in ['answered', 'hung_up_early'] }}"
+            sequence:
+              - service: counter.increment
+                target: { entity_id: counter.bedtime_picked_up }
+              - service: logbook.log
+                data:
+                  name: Bedtime call
+                  message: >-
+                    picked up{{ ' (hung up before the message finished)'
+                      if trigger.event.data.status == 'hung_up_early' else '' }}
+          - conditions: "{{ trigger.event.data.status == 'no_answer' }}"
+            sequence:
+              - service: counter.increment
+                target: { entity_id: counter.bedtime_missed }
+              - service: logbook.log
+                data:
+                  name: Bedtime call
+                  message: "not picked up"
+        default:
+          - service: logbook.log
+            data:
+              name: Bedtime call
+              message: "problem: {{ trigger.event.data.status }} {{ trigger.event.data.error }}"
