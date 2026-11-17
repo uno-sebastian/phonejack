@@ -1,0 +1,5 @@
+numpy
+soundfile
+sounddevice
+pyttsx3; sys_platform == "win32"
+faster-whisper

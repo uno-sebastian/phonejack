@@ -1,0 +1,22 @@
+# Install (on the Debian machine, as your normal user):
+#   mkdir -p ~/.config/systemd/user
+#   cp ~/phonejack/ha/phonejack.service ~/.config/systemd/user/
+#   systemctl --user daemon-reload
+#   systemctl --user enable --now phonejack.service
+#   sudo loginctl enable-linger $USER     # start at boot without logging in
+#   journalctl --user -u phonejack -f         # logs
+[Unit]
+Description=Phonejack call server
+After=pipewire.service wireplumber.service bluetooth.target
+Wants=pipewire.service wireplumber.service
+
+[Service]
+# Your Cell2Jack's Bluetooth address (bluetoothctl devices)
+Environment=PHONEJACK_ADDR=AA:BB:CC:DD:EE:FF
+WorkingDirectory=%h/phonejack
+ExecStart=%h/phonejack/venv/bin/python -u phonejack_server.py
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target

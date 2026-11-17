@@ -1,0 +1,68 @@
+# Home Assistant side of phonejack.
+# Merge into configuration.yaml (or split into packages). Restart HA after adding rest_command.
+#
+# Trigger a call from anywhere (curl, another automation, a button):
+#   curl -X POST http://<ha>:8123/api/webhook/phonejack_call \
+#     -H 'Content-Type: application/json' \
+#     -d '{"question":"Is the laundry done?","id":"laundry1"}'
+#
+# The server's result arrives at the phonejack_result webhook and is fired as the
+# event `phonejack_result` (event_data: status, answer, heard, hung_up, id, error).
+#
+# NOTE: 127.0.0.1 only works if HA runs directly on the same machine as the server
+# (HA Core / venv). If HA is in Docker, use host networking or change the URLs below
+# (and CALLBACK_PREFIX in phonejack_server.py).
+
+rest_command:
+  phonejack_call:
+    url: "http://127.0.0.1:8765/"
+    method: post
+    content_type: "application/json"
+    timeout: 10
+    payload: >-
+      {{ {
+        "question": question | default(""),
+        "say": say | default(""),
+        "id": id | default(""),
+        "ring_seconds": ring_seconds | default(40),
+        "listen_seconds": listen_seconds | default(6),
+        "hangup_wait_seconds": hangup_wait_seconds | default(60),
+        "callback": "http://127.0.0.1:8123/api/webhook/phonejack_result"
+      } | tojson }}
+
+automation:
+  - alias: "Phonejack - place call"
+    id: phonejack_place_call
+    mode: single
+    trigger:
+      - platform: webhook
+        webhook_id: phonejack_call
+        allowed_methods: [POST]
+        local_only: true
+    action:
+      - service: rest_command.phonejack_call
+        data:
+          question: "{{ trigger.json.question | default('') }}"
+          say: "{{ trigger.json.say | default('') }}"
+          id: "{{ trigger.json.id | default('') }}"
+          ring_seconds: "{{ trigger.json.ring_seconds | default(40) }}"
+          listen_seconds: "{{ trigger.json.listen_seconds | default(6) }}"
+          hangup_wait_seconds: "{{ trigger.json.hangup_wait_seconds | default(60) }}"
+
+  - alias: "Phonejack - result"
+    id: phonejack_result
+    mode: queued
+    trigger:
+      - platform: webhook
+        webhook_id: phonejack_result
+        allowed_methods: [POST]
+        local_only: true
+    action:
+      - event: phonejack_result
+        event_data:
+          status: "{{ trigger.json.status }}"
+          id: "{{ trigger.json.id | default('') }}"
+          answer: "{{ trigger.json.answer | default('') }}"
+          heard: "{{ trigger.json.heard | default('') }}"
+          hung_up: "{{ trigger.json.hung_up | default(none) }}"
+          error: "{{ trigger.json.error | default('') }}"
