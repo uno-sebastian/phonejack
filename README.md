@@ -46,8 +46,12 @@ Request fields: `question`, `say`, `id`, `callback`, `ring_seconds` (40),
 
 ### Run as a service
 
-Edit `PHONEJACK_ADDR` in `ha/phonejack.service`, then:
+Keep your own settings in a drop-in so the repo stays clean and `git pull` never conflicts:
 ```sh
+mkdir -p ~/.config/systemd/user/phonejack.service.d
+printf '[Service]
+Environment=PHONEJACK_ADDR=AA:BB:CC:DD:EE:FF
+' > ~/.config/systemd/user/phonejack.service.d/local.conf
 mkdir -p ~/.config/systemd/user && cp ha/phonejack.service ~/.config/systemd/user/
 systemctl --user daemon-reload && systemctl --user enable --now phonejack.service
 sudo loginctl enable-linger $USER
